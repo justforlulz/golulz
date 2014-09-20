@@ -14,7 +14,7 @@ const (
 	SEED        = 72
 	WEEK        = 7
 	ROWS        = 81
-	MAX_COMMITS = 7 // TODO: Should be equal to ~74
+	MAX_COMMITS = 74 // TODO: Should be equal to ~74
 	START_DATE  = ""
 )
 
@@ -23,6 +23,7 @@ var (
 	flMaxRows    int
 	flMaxCommits int
 	flStartDate  string
+	totalCommits int
 )
 
 const (
@@ -51,13 +52,11 @@ func init() {
 
 	flag.Parse()
 
-	rand.Seed(time.Now().Unix())
-
 	if flSeed < 1 || flSeed > 100 {
 		flSeed = SEED
 	}
 
-	_, err := time.Parse("01/02/2006", value)
+	_, err := time.Parse("01/02/2006", flStartDate)
 	if flStartDate == "" || err != nil {
 		fmt.Println("please provide a valid date in MM/DD/YYYY format.")
 		os.Exit(2)
@@ -66,6 +65,10 @@ func init() {
 }
 
 func main() {
+	beginTime := time.Now()
+	totalCommits = 0
+
+	rand.Seed(beginTime.Unix())
 
 	var pattern string
 
@@ -81,13 +84,14 @@ func main() {
 	}
 
 	weeks := strings.Split(pattern, "\n")
-
 	date := parseTime(flStartDate)
 
 	for i := 0; i < len(weeks)-1; i++ {
 		week := weeks[i]
+
 		for j := range week {
 			cell := (string)(week[j])
+
 			if cell == "0" {
 				doCommits(date)
 			}
@@ -95,14 +99,22 @@ func main() {
 		}
 	}
 
+	endTime := time.Now()
+	fmt.Println("Boom! %d commits generated in %s duration.", totalCommits, (endTime.Sub(beginTime)).String())
+
 }
 func doCommits(date time.Time) {
 	date = addRandomDuration(date)
-	for i := 0; i < rand.Intn(flMaxCommits); i++ {
+	r := rand.Intn(flMaxCommits)
+	for i := 0; i < r; i++ {
 		formatted := formatTime(date)
+
 		os.Setenv("GIT_AUTHOR_DATE", formatted)
 		os.Setenv("GIT_COMMITTER_DATE", formatted)
-		cmd := exec.Command("git", "commit", "--allow-empty", "-m "+formatted)
+
+		msg := fmt.Sprintf("Commit: %02d/%02d (max: %02d) for Date: %s", i, r, flMaxCommits, date.Format(time.RFC822))
+		cmd := exec.Command("git", "commit", "--allow-empty", "-m "+msg)
+
 		out, err := cmd.Output()
 
 		if err != nil {
@@ -110,7 +122,9 @@ func doCommits(date time.Time) {
 			panic(err)
 		}
 
-		fmt.Println(string(out))
+		fmt.Print(string(out))
+		totalCommits++
+
 		date = addRandomDuration(date)
 	}
 
@@ -134,6 +148,7 @@ func nextDay(value time.Time) time.Time {
 }
 
 func addRandomDuration(value time.Time) time.Time {
+	t := time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, time.UTC)
 
 	h := rand.Intn(24)
 	m := rand.Intn(60)
@@ -141,7 +156,7 @@ func addRandomDuration(value time.Time) time.Time {
 
 	d := parseDuration(h, m, s)
 
-	return value.Add(d)
+	return t.Add(d)
 }
 
 func parseDuration(h int, m int, s int) time.Duration {
